@@ -1,0 +1,134 @@
+#include <ESP8266WiFi.h>
+#include <ESP8266WebServer.h>
+
+const char* ssid = "Nome da sua rede Wi-Fi";
+const char* password = "Senha da sua rede Wi-Fi";
+
+ESP8266WebServer server(80);
+
+
+#define   RELE1      D0
+#define   RELE2      D1
+bool      RELE1_State = LOW;
+bool      RELE2_State = LOW;
+
+void setup() {
+  Serial.begin(115200);
+  delay(100);
+  pinMode(RELE1, OUTPUT);
+  pinMode(RELE2, OUTPUT);
+
+  Serial.println("Connecting to ");
+  Serial.println(ssid);
+
+  WiFi.begin(ssid, password);
+
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+  }
+  Serial.println("");
+  Serial.println("WiFi connected..!");
+  Serial.print("Got IP: ");  Serial.println(WiFi.localIP());
+
+  server.on("/", handle_OnConnect);
+  server.on("/rele1on", handle_rele1on);
+  server.on("/rele1off", handle_rele1off);
+  server.on("/rele2on", handle_rele2on);
+  server.on("/rele2off", handle_rele2off);
+  server.onNotFound(handle_NotFound);
+
+  server.begin();
+  Serial.println("HTTP server started");
+}
+
+void loop() {
+  server.handleClient();
+  if (RELE1_State) {
+    digitalWrite(RELE1, HIGH);
+  }
+  else {
+    digitalWrite(RELE1, LOW);
+  }
+
+  if (RELE2_State) {
+    digitalWrite(RELE2, HIGH);
+  }
+  else {
+    digitalWrite(RELE2, LOW);
+  }
+}
+
+void handle_OnConnect() {
+  RELE1_State = LOW;
+  RELE2_State = LOW;
+  Serial.println("GPIO16 Status: OFF | GPIO5 Status: OFF");
+  server.send(200, "text/html", SendHTML(RELE1_State, RELE2_State));
+}
+
+void handle_rele1on() {
+  RELE1_State = HIGH;
+  Serial.println("GPIO7 Status: ON");
+  server.send(200, "text/html", SendHTML(true, RELE2_State));
+}
+
+void handle_rele1off() {
+  RELE1_State = LOW;
+  Serial.println("GPIO7 Status: OFF");
+  server.send(200, "text/html", SendHTML(false, RELE2_State));
+}
+
+void handle_rele2on() {
+  RELE2_State = HIGH;
+  Serial.println("GPIO6 Status: ON");
+  server.send(200, "text/html", SendHTML(RELE1_State, true));
+}
+
+void handle_rele2off() {
+  RELE2_State = LOW;
+  Serial.println("GPIO6 Status: OFF");
+  server.send(200, "text/html", SendHTML(RELE1_State, false));
+}
+
+void handle_NotFound() {
+  server.send(404, "text/plain", "Not found");
+}
+
+
+String SendHTML(uint8_t rele1stat, uint8_t rele2stat) {
+  String fvml = "<!DOCTYPE html> <html>"
+                "<head><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0, user-scalable=no\">"
+                "<title>LED Control</title>"
+                "<style>html { font-family:  Helvetica; display: inline-block; margin: 0px auto; text-align: center;}"
+                "body{background-color: black; margin-top: 50px;} h1 {color: #00cc00;margin: 50px auto 30px;}"
+                "h3 {color: #00cc00;margin-bottom: 50px;}h4 {color: #ffd699;margin: 50px auto 30px;}"
+                ".button {display: block;width: 110px;background-color: #1abc9c;border: none;color: white;padding:"
+                "13px 30px;text-decoration: none;font-size: 25px;margin: 0px auto 35px;cursor: pointer;border-radius: 4px;}"
+                ".button-on {background-color: #9494b8;}"
+                ".button-on:active {background-color: #ff471a;}"
+                ".button-off {background-color: #0066ff;}"
+                ".button-off:active {background-color: #2c3e50;}"
+                "p {font-size: 14px;color: #888;margin-bottom: 10px;}"
+                "</style>"
+                "</head>"
+                "<body>"
+                "<h1>WEB SERVER</h1>"
+                "<h3>Acionamento De Atuadores</h3>\n";
+
+  if (rele1stat) {
+    fvml += "<p>Rele 1 Status: ON</p><a class=\"button button-off\" href=\"/rele1off\">Recuado</a>\n";
+  } else {
+    fvml += "<p>Rele 1 Status: OFF</p><a class=\"button button-on\" href=\"/rele1on\">Avancado</a>\n";
+  }
+
+  if (rele2stat) {
+    fvml += "<p>Rele 2 Status: ON</p><a class=\"button button-off\" href=\"/rele2off\">Recuado</a>\n";
+  } else {
+    fvml += "<p>Rele 2 Status: OFF</p><a class=\"button button-on\" href=\"/rele2on\">Avancado</a>\n";
+  }
+  fvml += "</body>\n";
+  fvml += "</html>\n";
+  fvml += "<h4><em>By: ";
+  fvml += "<h4><em>Itallo Yggor Barros dos Santos";
+  return fvml;
+}
